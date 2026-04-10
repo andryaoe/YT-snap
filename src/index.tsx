@@ -1,5 +1,8 @@
-import { Frog, Button } from 'frog' // Pastikan urutannya benar
+import { Frog } from 'frog'
 import { serve } from '@hono/node-server'
+
+// Mengambil Button dari properti Frog jika named export tidak tersedia
+const Button = Frog.Button
 
 type State = {
   index: number
@@ -20,6 +23,7 @@ async function getVideos() {
     const data = await res.json()
     return data.items || []
   } catch (error) {
+    console.error("YouTube API Error:", error)
     return []
   }
 }
@@ -55,7 +59,7 @@ app.frame('/', async (c) => {
       <Button value="next">Next ➡️</Button>,
       <Button.Link href={`https://youtu.be/${videoId}`}>📺 Play</Button.Link>,
       <Button.Link href="https://youtube.com/@andryaoe?sub_confirmation=1">🔔 Subscribe</Button.Link>,
-      <Button.Link href={`https://warpcast.com/~/compose?text=Cek video terbaru @andryaoe.eth!&embeds[]=${encodeURIComponent('https://' + c.req.header('host'))}`}>
+      <Button.Link href={`https://warpcast.com/~/compose?text=Cek video terbaru @andryaoe.eth!&embeds[]=${encodeURIComponent('https://' + (c.req.header('host') || ''))}`}>
         📤 Share
       </Button.Link>
     ],
@@ -63,6 +67,8 @@ app.frame('/', async (c) => {
 })
 
 const port = Number(process.env.PORT) || 3000
+console.log(`Server is running on port ${port}`)
+
 serve({
   fetch: app.fetch,
   port,
