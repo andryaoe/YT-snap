@@ -1,18 +1,14 @@
-import * as FrogModule from 'frog'
-import { serve } from '@hono/node-server'
+import { createRequire } from 'module'
+const require = createRequire(import.meta.url)
 
-// Deteksi letak Frog (tergantung versi library yang terinstal)
-const Frog = (FrogModule as any).Frog || (FrogModule as any).default?.Frog || (FrogModule as any).default
-const Button = (Frog as any).Button || (FrogModule as any).Button
+const { Frog, Button } = require('frog')
+const { serve } = require('@hono/node-server')
 
-type State = {
-  index: number
-}
-
-// Inisialisasi app
 export const app = new Frog({
-  initialState: { index: 0 },
   title: 'YouTube @andryaoe.eth',
+  initialState: {
+    index: 0
+  }
 })
 
 async function getVideos() {
@@ -33,7 +29,7 @@ app.frame('/', async (c) => {
   const { deriveState, buttonValue } = c
   const videos = await getVideos()
   
-  const state = deriveState((previousState: State) => {
+  const state = deriveState((previousState) => {
     if (buttonValue === 'next' && previousState.index < videos.length - 1) previousState.index++
     if (buttonValue === 'prev' && previousState.index > 0) previousState.index--
   })
@@ -59,20 +55,15 @@ app.frame('/', async (c) => {
       <Button value="prev">⬅️ Prev</Button>,
       <Button value="next">Next ➡️</Button>,
       <Button.Link href={`https://youtu.be/${videoId}`}>📺 Play</Button.Link>,
-      <Button.Link href="https://youtube.com/@andryaoe?sub_confirmation=1">🔔 Subscribe</Button.Link>,
-      <Button.Link href={`https://warpcast.com/~/compose?text=Cek video terbaru @andryaoe.eth!&embeds[]=${encodeURIComponent('https://' + (c.req.header('host') || ''))}`}>
-        📤 Share
-      </Button.Link>
+      <Button.Link href="https://youtube.com/@andryaoe?sub_confirmation=1">🔔 Subscribe</Button.Link>
     ],
   })
 })
 
 const port = Number(process.env.PORT) || 3000
-console.log(`Server started on port ${port}`)
+console.log(`🚀 Server otewe di port ${port}`)
 
 serve({
-  fetch: (app as any).fetch,
+  fetch: app.fetch,
   port,
 })
-
-export default app
