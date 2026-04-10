@@ -1,13 +1,12 @@
-import { Frog } from 'frog'
+import pkg from 'frog'
+const { Frog, Button } = pkg
 import { serve } from '@hono/node-server'
-
-// Mengambil Button dari properti Frog jika named export tidak tersedia
-const Button = Frog.Button
 
 type State = {
   index: number
 }
 
+// Inisialisasi app
 export const app = new Frog<{ State: State }>({
   initialState: { index: 0 },
   title: 'YouTube @andryaoe.eth',
@@ -23,7 +22,6 @@ async function getVideos() {
     const data = await res.json()
     return data.items || []
   } catch (error) {
-    console.error("YouTube API Error:", error)
     return []
   }
 }
@@ -41,7 +39,7 @@ app.frame('/', async (c) => {
     return c.res({
       image: (
         <div style={{ color: 'white', display: 'flex', background: 'black', width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', fontSize: 40 }}>
-          Gagal memuat video.
+          Gagal memuat video YouTube.
         </div>
       ),
       intents: [<Button.Reset>Coba Lagi</Button.Reset>]
@@ -67,7 +65,7 @@ app.frame('/', async (c) => {
 })
 
 const port = Number(process.env.PORT) || 3000
-console.log(`Server is running on port ${port}`)
+console.log(`Server started on port ${port}`)
 
 serve({
   fetch: app.fetch,
