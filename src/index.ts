@@ -14,12 +14,10 @@ app.get("/videos", async (req, res) => {
     const data = await getVideos(pageToken);
     res.json(data);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch videos" });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
-});
+app.listen(PORT, () => console.log("Server running " + PORT));
