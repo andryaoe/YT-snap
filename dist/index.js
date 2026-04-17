@@ -4,6 +4,9 @@ import { fetchVideos } from "./youtube.js";
 import { buildVideoUI } from "./ui.js";
 const app = new Hono();
 let videosCache = [];
+app.get("/", (c) => {
+    return c.text("YT Snap server is running 🚀");
+});
 app.post("/", async (c) => {
     if (videosCache.length === 0) {
         videosCache = await fetchVideos();

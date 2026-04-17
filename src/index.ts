@@ -7,6 +7,9 @@ const app = new Hono()
 
 let videosCache: any[] = []
 
+app.get("/", (c) => {
+  return c.text("YT Snap server is running 🚀")
+})
 app.post("/", async (c) => {
   if (videosCache.length === 0) {
     videosCache = await fetchVideos()
