@@ -1,14 +1,25 @@
 const API_KEY = process.env.YOUTUBE_API_KEY;
-const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-export async function fetchVideos() {
-    const url = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet&order=date&maxResults=25`;
-    const res = await fetch(url);
+const CHANNEL_ID = process.env.CHANNEL_ID;
+export async function getVideos(pageToken) {
+    const url = new URL("https://www.googleapis.com/youtube/v3/search");
+    url.searchParams.set("key", API_KEY);
+    url.searchParams.set("channelId", CHANNEL_ID);
+    url.searchParams.set("part", "snippet");
+    url.searchParams.set("order", "date");
+    url.searchParams.set("maxResults", "6");
+    url.searchParams.set("type", "video");
+    if (pageToken)
+        url.searchParams.set("pageToken", pageToken);
+    const res = await fetch(url.toString());
     const data = await res.json();
-    return data.items
-        .filter((item) => item.id.videoId)
-        .map((item) => ({
+    const videos = data.items.map((item) => ({
         id: item.id.videoId,
         title: item.snippet.title,
         thumbnail: item.snippet.thumbnails.high.url,
     }));
+    return {
+        videos,
+        nextPageToken: data.nextPageToken,
+        prevPageToken: data.prevPageToken,
+    };
 }
