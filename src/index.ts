@@ -1,7 +1,7 @@
 import { Hono } from "hono"
 import { serve } from "@hono/node-server"
-import { fetchVideos } from "./youtube"
-import { buildVideoUI } from "./ui"
+import { fetchVideos } from "./youtube.js"
+import { buildVideoUI } from "./ui.js"
 
 const app = new Hono()
 

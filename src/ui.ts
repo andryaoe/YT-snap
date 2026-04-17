@@ -1,4 +1,4 @@
-import { Video } from "./youtube"
+import { Video } from "./youtube.js"
 
 export function buildVideoUI(video: Video) {
   return {
