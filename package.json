@@ -1,13 +1,21 @@
 {
   "name": "yt-snap",
   "version": "1.0.0",
+  "description": "Farcaster Snap - YouTube Channel Viewer",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "tsx src/index.tsx"
+    "dev": "tsx src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
   },
   "dependencies": {
-    "frog": "latest",
-    "hono": "latest",
-    "tsx": "latest"
+    "@hono/node-server": "^1.19.14",
+    "hono": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3"
   }
 }
