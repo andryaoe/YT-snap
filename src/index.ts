@@ -6,66 +6,77 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-
-// CORS super longgar agar tidak diblokir emulator
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Accept"]
-}));
+app.use(cors());
 
 const API_KEY = process.env.YOUTUBE_API_KEY || "";
 const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
 
 app.get("/frame", async (req: Request, res: Response) => {
   const snapType = "application/vnd.farcaster.snap+json";
-  
-  // Deteksi jika yang memanggil adalah Farcaster (lewat Accept header)
-  if (req.headers.accept?.includes(snapType)) {
+  const protocol = req.headers["x-forwarded-proto"] || "https";
+  const fullUrl = `${protocol}://${req.get("host")}/frame`;
+
+  // 1. HEADER WAJIB (Harus muncul di setiap request)
+  res.setHeader("Vary", "Accept");
+  res.setHeader("Link", `<${fullUrl}>; rel="alternate"; type="${snapType}"`);
+
+  // 2. LOGIKA SNAP (Jika diminta oleh Warpcast)
+  if (req.headers.accept?.includes(snapType) || req.query.json === "true") {
     try {
       const ytUrl = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
-      const ytResponse = await fetch(ytUrl);
-      const data: any = await ytResponse.json();
+      const ytRes = await fetch(ytUrl);
+      const data: any = await ytRes.json();
       
       const v = data.items[0];
+      const videoId = v.id.videoId;
       const title = v.snippet.title;
       const thumbnail = v.snippet.thumbnails.high.url;
 
-      // Set header secara manual dan tegas
       res.setHeader("Content-Type", snapType);
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      
-      return res.status(200).json({
+      return res.json({
         version: "1",
         type: "snap",
         content: {
           body: title,
-          image: thumbnail
-          // Tombol dihapus sementara untuk memastikan tidak ada error URL
+          image: thumbnail,
+          buttons: [
+            {
+              label: "▶️ Watch Video",
+              type: "link",
+              target: `https://www.youtube.com/watch?v=${videoId}`
+            },
+            {
+              label: "🔔 Subscribe",
+              type: "link",
+              target: `https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1`
+            }
+          ]
         }
       });
-    } catch (err) {
-      res.setHeader("Content-Type", snapType);
-      return res.status(200).json({
-        version: "1",
-        type: "snap",
-        content: { body: "Gagal mengambil data YouTube" }
-      });
+    } catch (e) {
+      return res.status(500).json({ error: "API Error" });
     }
   }
 
-  // Tampilan Browser & Header Discovery
-  res.setHeader("Link", `<https://${req.get("host")}/frame>; rel="alternate"; type="${snapType}"`);
+  // 3. LOGIKA FRAME (HTML untuk crawler agar muncul di feed)
   res.send(`
+    <!DOCTYPE html>
     <html>
-      <head><meta property="fc:snap:version" content="1"></head>
-      <body style="text-align:center;padding:50px;">
-        <h2>YT-Snap Server Active</h2>
-        <p>Gunakan link ini di Warpcast.</p>
+      <head>
+        <title>YouTube Snap</title>
+        <meta property="fc:snap:version" content="1">
+        <meta property="fc:snap:url" content="${fullUrl}">
+        
+        <meta property="og:title" content="Latest YouTube Video">
+        <meta property="og:image" content="https://i.ytimg.com/vi/twEe-vA3E4g/hqdefault.jpg">
+      </head>
+      <body style="text-align:center;font-family:sans-serif;padding-top:100px;">
+        <h2>🎬 YouTube Snap is Live</h2>
+        <p>Open this in Warpcast to interact.</p>
       </body>
     </html>
   `);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Running on ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
