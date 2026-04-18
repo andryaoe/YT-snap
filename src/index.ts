@@ -6,13 +6,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-
-// Konfigurasi CORS yang lebih spesifik untuk Farcaster
-app.use(cors({
-  origin: "*",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Accept"]
-}));
+app.use(cors());
 
 const API_KEY = process.env.YOUTUBE_API_KEY || "";
 const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
@@ -22,13 +16,8 @@ app.get("/frame", async (req: Request, res: Response) => {
   const host = req.get("host");
   const fullUrl = `https://${host}/frame`;
 
-  // 1. LOGIKA RESPONS SNAP (JSON)
-  // Dipicu saat Warpcast meminta data interaktif
-  const isSnapRequest = 
-    req.headers.accept?.includes(snapType) || 
-    req.query.json === "true";
-
-  if (isSnapRequest) {
+  // 1. LOGIKA UNTUK SNAP (JSON)
+  if (req.headers.accept?.includes(snapType) || req.query.json === "true") {
     try {
       const ytUrl = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
       const ytRes = await fetch(ytUrl);
@@ -48,7 +37,7 @@ app.get("/frame", async (req: Request, res: Response) => {
           image: thumbnail,
           buttons: [
             {
-              label: "▶️ Tonton di YouTube",
+              label: "▶️ Watch on YouTube",
               type: "link",
               target: `https://www.youtube.com/watch?v=${videoId}`
             },
@@ -62,61 +51,37 @@ app.get("/frame", async (req: Request, res: Response) => {
       });
     } catch (e) {
       res.setHeader("Content-Type", snapType);
-      return res.status(200).json({
-        version: "1",
-        type: "snap",
-        content: { body: "Gagal memuat video terbaru." }
-      });
+      return res.status(200).json({ version: "1", type: "snap", content: { body: "YouTube API Error" } });
     }
   }
 
-  // 2. LOGIKA RESPONS BROWSER (HTML dengan Meta Tags v2)
-  // Penting agar "Preview" muncul di Feed Warpcast
-  res.setHeader("Vary", "Accept");
-  res.setHeader("Link", `<${fullUrl}>; rel="alternate"; type="${snapType}"`);
-
-  // Meta Tag Frame v2 dalam format JSON string
-  const frameV2Config = JSON.stringify({
-    version: "next",
-    imageUrl: "https://i.ytimg.com/vi/twEe-vA3E4g/hqdefault.jpg", // Thumbnail default
-    button: {
-      title: "Cek Video Terbaru",
-      action: {
-        type: "launch_frame",
-        name: "YouTube Snap",
-        url: fullUrl,
-        splashImageUrl: "https://i.ytimg.com/vi/twEe-vA3E4g/default.jpg",
-        splashBackgroundColor: "#ffffff"
-      }
-    }
-  });
-
+  // 2. LOGIKA UNTUK PREVIEW (HTML)
+  // Gunakan Meta Tags Frame v1 (Legacy) + v2 agar Warpcast tidak bingung
   res.send(`
     <!DOCTYPE html>
     <html>
       <head>
-        <title>YouTube Snap v2</title>
-        <meta name="fc:frame" content='${frameV2Config}' />
+        <title>YouTube Snap</title>
         
+        <meta property="fc:frame" content="vNext" />
+        <meta property="fc:frame:image" content="https://i.ytimg.com/vi/twEe-vA3E4g/hqdefault.jpg" />
+        <meta property="fc:frame:button:1" content="Check Latest Video" />
+        <meta property="fc:frame:button:1:action" content="link" />
+        <meta property="fc:frame:button:1:target" content="${fullUrl}?json=true" />
+
         <meta property="fc:snap:version" content="1">
         <meta property="fc:snap:url" content="${fullUrl}">
         
-        <meta property="og:title" content="YouTube Latest Video">
+        <meta property="og:title" content="YouTube Snap">
         <meta property="og:image" content="https://i.ytimg.com/vi/twEe-vA3E4g/hqdefault.jpg">
-        <meta property="og:description" content="Klik untuk melihat video terbaru dari channel Andryaoe">
       </head>
-      <body style="text-align:center; font-family:sans-serif; padding:50px; background:#f4f4f4;">
-        <div style="background:white; padding:30px; border-radius:20px; display:inline-block; box-shadow:0 10px 25px rgba(0,0,0,0.1); max-width:400px;">
-          <h2 style="color:#ff0000;">🎬 YouTube Snap v2</h2>
-          <hr>
-          <p>Server ini dikonfigurasi untuk <b>Farcaster Snap & Frame v2</b>.</p>
-          <p style="font-size:0.9em; color:#666;">Silakan salin link ini dan tempel di Warpcast untuk melihat hasilnya.</p>
-          <code style="background:#eee; padding:5px; border-radius:5px; display:block; word-break:break-all;">${fullUrl}</code>
-        </div>
+      <body style="text-align:center; padding:50px; font-family:sans-serif;">
+        <h2>Server Aktif!</h2>
+        <p>Buka di aplikasi Warpcast untuk melihat interaksi Snap.</p>
       </body>
     </html>
   `);
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server Frame v2 berjalan di port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Running on port ${PORT}`));
