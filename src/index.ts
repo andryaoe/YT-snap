@@ -6,19 +6,31 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// 1. Konfigurasi CORS (Sangat Penting untuk Farcaster Validator)
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
 
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.YOUTUBE_API_KEY || "";
 const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID || "";
 
-/* =============================== GET YOUTUBE VIDEOS =============================== */
+/* =============================== 
+   GET YOUTUBE VIDEOS (API BIASA)
+   =============================== */
 app.get("/videos", async (req: Request, res: Response) => {
   try {
     const url = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=6`;
     const yt = await fetch(url);
     const data: any = await yt.json();
     
+    if (!data.items) {
+      return res.status(404).json({ error: "No videos found" });
+    }
+
     const videos = data.items.map((v: any) => ({
       id: v.id.videoId,
       title: v.snippet.title,
@@ -32,27 +44,47 @@ app.get("/videos", async (req: Request, res: Response) => {
   }
 });
 
-/* =============================== SNAP DISCOVERY PAGE =============================== */
+/* =====================================
+   SNAP DISCOVERY PAGE (/frame)
+   Halaman ini yang dimasukkan ke Validator
+   ===================================== */
 app.get("/frame", (req: Request, res: Response) => {
+  const protocol = req.headers["x-forwarded-proto"] || "http";
+  const fullUrl = `${protocol}://${req.get("host")}/snap`;
+  
+  // Header Link: Cara utama Farcaster Crawler menemukan Snap Anda
   res.setHeader(
     "Link",
-    `<https://${req.get("host")}/snap>; rel="alternate"; type="application/vnd.farcaster.snap+json"`
+    `<${fullUrl}>; rel="alternate"; type="application/vnd.farcaster.snap+json"`
   );
+  
+  res.setHeader("Content-Type", "text/html");
+  
   res.send(`
+    <!DOCTYPE html>
     <html>
       <head>
         <title>YouTube Snap</title>
         <meta property="fc:snap:version" content="1">
+        <meta property="fc:snap:url" content="${fullUrl}">
       </head>
-      <body style="font-family:sans-serif;text-align:center;padding-top:40px">
-        <h2>🎬 Farcaster Snap Ready</h2>
-        <p>Open this link in Warpcast to see the Snap.</p>
+      <body style="font-family:sans-serif;text-align:center;padding-top:50px;background-color:#f4f4f9;">
+        <div style="max-width:500px;margin:auto;background:white;padding:20px;border-radius:15px;box-shadow:0 4px 6px rgba(0,0,0,0.1)">
+          <h2>🎬 YT-Snap is Ready!</h2>
+          <p>Copy this URL and paste it into Warpcast or the Farcaster Snap Validator.</p>
+          <div style="background:#eee;padding:10px;border-radius:5px;word-break:break-all;">
+            <code>${protocol}://${req.get("host")}/frame</code>
+          </div>
+        </div>
       </body>
     </html>
   `);
 });
 
-/* =============================== SNAP JSON ENDPOINT =============================== */
+/* =====================================
+   SNAP JSON ENDPOINT (/snap)
+   Data JSON yang sebenarnya dibaca Warpcast
+   ===================================== */
 app.get("/snap", async (req: Request, res: Response) => {
   try {
     const url = `https://www.googleapis.com/youtube/v3/search?key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
@@ -60,7 +92,7 @@ app.get("/snap", async (req: Request, res: Response) => {
     const data: any = await yt.json();
     
     if (!data.items || data.items.length === 0) {
-      return res.status(404).json({ error: "No videos found" });
+      return res.status(404).json({ error: "YouTube data not found. Check API Key/Channel ID." });
     }
 
     const v = data.items[0];
@@ -68,6 +100,7 @@ app.get("/snap", async (req: Request, res: Response) => {
     const title = v.snippet.title;
     const thumbnail = v.snippet.thumbnails.high.url;
 
+    // WAJIB: Atur Content-Type khusus Farcaster Snap
     res.setHeader("Content-Type", "application/vnd.farcaster.snap+json");
     res.setHeader("Access-Control-Allow-Origin", "*");
 
@@ -79,7 +112,7 @@ app.get("/snap", async (req: Request, res: Response) => {
         image: thumbnail,
         buttons: [
           {
-            label: "▶️ Play Video",
+            label: "▶️ Watch Video",
             type: "link",
             target: `https://www.youtube.com/watch?v=${videoId}`,
           },
@@ -92,9 +125,12 @@ app.get("/snap", async (req: Request, res: Response) => {
       },
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Snap error" });
+    console.error("Snap error:", err);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔗 Frame URL: http://localhost:${PORT}/frame`);
+});
