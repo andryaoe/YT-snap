@@ -1,57 +1,20 @@
-import express from "express";
-import cors from "cors";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const app = express();
-app.use(cors());
-
-const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.YOUTUBE_API_KEY!;
-const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID!;
-
-/* ===============================
-   GET YOUTUBE VIDEOS
-=============================== */
-app.get("/videos", async (req, res) => {
-  try {
-    const url =
-      `https://www.googleapis.com/youtube/v3/search?` +
-      `key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=6`;
-
-    const yt = await fetch(url);
-
-    // ⭐ FIX TYPESCRIPT UNKNOWN
-    const data: any = await yt.json();
-
-    const videos = data.items.map((v: any) => ({
-      id: v.id.videoId,
-      title: v.snippet.title,
-      thumbnail: v.snippet.thumbnails.high.url,
-    }));
-
-    res.json({ videos });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch YouTube videos" });
-  }
-});
-
-/* ===============================
-   SNAP DISCOVERY PAGE
-=============================== */
+/* =============================== SNAP DISCOVERY PAGE =============================== */
 app.get("/frame", (req, res) => {
+  // Pastikan URL di bawah ini adalah URL publik Railway Anda yang mengarah ke JSON /snap
   res.setHeader(
     "Link",
     `<https://yt-snap-production.up.railway.app/snap>; rel="alternate"; type="application/vnd.farcaster.snap+json"`
   );
-
+  
+  // Tambahkan Content-Type HTML agar crawler yakin ini halaman web
+  res.setHeader("Content-Type", "text/html");
+  
   res.send(`
     <html>
       <head>
         <title>YouTube Snap</title>
+        <meta property="fc:snap:version" content="1">
+        <meta property="fc:snap:url" content="https://yt-snap-production.up.railway.app/snap">
       </head>
       <body style="font-family:sans-serif;text-align:center;padding-top:40px">
         <h2>🎬 Farcaster Snap Ready</h2>
@@ -61,52 +24,51 @@ app.get("/frame", (req, res) => {
   `);
 });
 
-/* ===============================
-   SNAP JSON ENDPOINT
-=============================== */
+/* =============================== SNAP JSON ENDPOINT =============================== */
 app.get("/snap", async (req, res) => {
   try {
-    const url =
-      `https://www.googleapis.com/youtube/v3/search?` +
+    const url = `https://www.googleapis.com/youtube/v3/search?` +
       `key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
 
     const yt = await fetch(url);
-
-    // ⭐ FIX TYPESCRIPT UNKNOWN
     const data: any = await yt.json();
-
     const v = data.items[0];
 
     const videoId = v.id.videoId;
     const title = v.snippet.title;
     const thumbnail = v.snippet.thumbnails.high.url;
 
+    // WAJIB: Atur Content-Type JSON Snap
+    res.setHeader("Content-Type", "application/vnd.farcaster.snap+json");
+    res.setHeader("Access-Control-Allow-Origin", "*"); // Izinkan Farcaster menarik data
+
     res.json({
       version: "1",
-      image: thumbnail,
-      buttons: [
-        {
-          label: "▶️ Play Video",
-          action: "link",
-          target: `https://www.youtube.com/watch?v=${videoId}`,
-        },
-        {
-          label: "🔔 Subscribe",
-          action: "link",
-          target: `https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1`,
-        },
-        {
-          label: "🔁 Share",
-          action: "link",
-          target:
-            "https://warpcast.com/~/compose?text=Watch this video&embeds[]=https://yt-snap-production.up.railway.app/frame",
-        },
-      ],
+      type: "snap", // HARUS ADA
+      content: {    // SEMUA PROPERTI VISUAL HARUS DI DALAM CONTENT
+        body: title,
+        image: thumbnail,
+        buttons: [
+          {
+            label: "▶️ Play Video",
+            type: "link", // Gunakan 'type', bukan 'action' (tergantung versi SDK yang dipakai)
+            target: `https://www.youtube.com/watch?v=${videoId}`,
+          },
+          {
+            label: "🔔 Subscribe",
+            type: "link",
+            target: `https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1`,
+          },
+          {
+            label: "🔁 Share",
+            type: "link",
+            target: `https://warpcast.com/~/compose?text=Watch this video&embeds[]=https://yt-snap-production.up.railway.app/frame`,
+          }
+        ],
+      },
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Snap error" });
   }
 });
-
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
