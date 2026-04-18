@@ -1,58 +1,102 @@
 import express from "express";
+import cors from "cors";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 
 dotenv.config();
-
 const app = express();
+app.use(cors());
+
 const PORT = process.env.PORT || 3000;
+const API_KEY = process.env.YOUTUBE_API_KEY!;
+const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID!;
 
-const API = "https://yt-snap-production.up.railway.app/videos";
+//
+// GET YOUTUBE VIDEOS (sudah jalan)
+//
+app.get("/videos", async (req, res) => {
+  try {
+    const url =
+      `https://www.googleapis.com/youtube/v3/search?` +
+      `key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=6`;
 
-app.get("/", (req, res) => {
-  res.send("YT SNAP API RUNNING");
+    const yt = await fetch(url);
+    const data = await yt.json();
+
+    const videos = data.items.map((v: any) => ({
+      id: v.id.videoId,
+      title: v.snippet.title,
+      thumbnail: v.snippet.thumbnails.high.url,
+    }));
+
+    res.json({ videos });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch YouTube videos" });
+  }
 });
 
-app.get("/frame", async (req, res) => {
-  try {
-    const r = await fetch(API);
-    const data: any = await r.json();
-    const video = data.videos[0];
+//
+// SNAP DISCOVERY PAGE (ini yang kurang tadi)
+//
+app.get("/frame", (req, res) => {
+  res.setHeader(
+    "Link",
+    `<https://yt-snap-production.up.railway.app/snap>; rel="alternate"; type="application/vnd.farcaster.snap+json"`
+  );
 
-    const html = `
-    <!DOCTYPE html>
+  res.send(`
     <html>
       <head>
-        <title>YT Snap</title>
-
-        <meta property="og:title" content="${video.title}" />
-        <meta property="og:image" content="${video.thumbnail}" />
-
-        <meta property="fc:frame" content="vNext" />
-        <meta property="fc:frame:image" content="${video.thumbnail}" />
-
-        <meta property="fc:frame:button:1" content="▶️ Watch" />
-        <meta property="fc:frame:button:1:action" content="link" />
-        <meta property="fc:frame:button:1:target" content="https://youtube.com/watch?v=${video.id}" />
-
-        <meta property="fc:frame:button:2" content="❤️ Subscribe" />
-        <meta property="fc:frame:button:2:action" content="link" />
-        <meta property="fc:frame:button:2:target" content="https://youtube.com/channel/${process.env.YOUTUBE_CHANNEL_ID}" />
-
-        <meta property="fc:frame:button:3" content="🔁 Share" />
-        <meta property="fc:frame:button:3:action" content="link" />
-        <meta property="fc:frame:button:3:target" content="https://warpcast.com/~/compose?text=Check%20this%20video" />
+        <title>YouTube Snap</title>
       </head>
-      <body>
-        Frame Ready
+      <body style="font-family:sans-serif;text-align:center;padding-top:40px">
+        <h2>🎬 Farcaster Snap Ready</h2>
+        <p>Open this link in Warpcast to see the Snap.</p>
       </body>
     </html>
-    `;
+  `);
+});
 
-    res.setHeader("Content-Type", "text/html");
-    res.send(html);
+//
+// SNAP JSON ENDPOINT (ini yang akan dibaca Farcaster)
+//
+app.get("/snap", async (req, res) => {
+  try {
+    const url =
+      `https://www.googleapis.com/youtube/v3/search?` +
+      `key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
+
+    const yt = await fetch(url);
+    const data = await yt.json();
+    const v = data.items[0];
+
+    const videoId = v.id.videoId;
+    const title = v.snippet.title;
+    const thumbnail = v.snippet.thumbnails.high.url;
+
+    res.json({
+      version: "1",
+      image: thumbnail,
+      buttons: [
+        {
+          label: "▶️ Play Video",
+          action: "link",
+          target: `https://www.youtube.com/watch?v=${videoId}`,
+        },
+        {
+          label: "🔔 Subscribe",
+          action: "link",
+          target: `https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1`,
+        },
+        {
+          label: "🔁 Share",
+          action: "link",
+          target: `https://warpcast.com/~/compose?text=Watch this video&embeds[]=https://yt-snap-production.up.railway.app/frame`,
+        },
+      ],
+    });
   } catch (err) {
-    res.send("Frame error");
+    res.status(500).json({ error: "Snap error" });
   }
 });
 
