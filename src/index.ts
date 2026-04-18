@@ -4,6 +4,7 @@ import fetch from "node-fetch";
 import dotenv from "dotenv";
 
 dotenv.config();
+
 const app = express();
 app.use(cors());
 
@@ -11,9 +12,9 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.YOUTUBE_API_KEY!;
 const CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID!;
 
-//
-// GET YOUTUBE VIDEOS (sudah jalan)
-//
+/* ===============================
+   GET YOUTUBE VIDEOS
+=============================== */
 app.get("/videos", async (req, res) => {
   try {
     const url =
@@ -21,7 +22,9 @@ app.get("/videos", async (req, res) => {
       `key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=6`;
 
     const yt = await fetch(url);
-    const data = await yt.json();
+
+    // ⭐ FIX TYPESCRIPT UNKNOWN
+    const data: any = await yt.json();
 
     const videos = data.items.map((v: any) => ({
       id: v.id.videoId,
@@ -31,13 +34,14 @@ app.get("/videos", async (req, res) => {
 
     res.json({ videos });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to fetch YouTube videos" });
   }
 });
 
-//
-// SNAP DISCOVERY PAGE (ini yang kurang tadi)
-//
+/* ===============================
+   SNAP DISCOVERY PAGE
+=============================== */
 app.get("/frame", (req, res) => {
   res.setHeader(
     "Link",
@@ -57,9 +61,9 @@ app.get("/frame", (req, res) => {
   `);
 });
 
-//
-// SNAP JSON ENDPOINT (ini yang akan dibaca Farcaster)
-//
+/* ===============================
+   SNAP JSON ENDPOINT
+=============================== */
 app.get("/snap", async (req, res) => {
   try {
     const url =
@@ -67,7 +71,10 @@ app.get("/snap", async (req, res) => {
       `key=${API_KEY}&channelId=${CHANNEL_ID}&part=snippet,id&order=date&maxResults=1`;
 
     const yt = await fetch(url);
-    const data = await yt.json();
+
+    // ⭐ FIX TYPESCRIPT UNKNOWN
+    const data: any = await yt.json();
+
     const v = data.items[0];
 
     const videoId = v.id.videoId;
@@ -91,13 +98,15 @@ app.get("/snap", async (req, res) => {
         {
           label: "🔁 Share",
           action: "link",
-          target: `https://warpcast.com/~/compose?text=Watch this video&embeds[]=https://yt-snap-production.up.railway.app/frame`,
+          target:
+            "https://warpcast.com/~/compose?text=Watch this video&embeds[]=https://yt-snap-production.up.railway.app/frame",
         },
       ],
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Snap error" });
   }
 });
 
-app.listen(PORT, () => console.log("Server running"));
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
